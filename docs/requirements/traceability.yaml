@@ -1,0 +1,16 @@
+srs_version: "1.0"
+srs_date: "2026-09-30"
+note: "Phase-0 is exploratory; no production requirement is implemented."
+groups:
+  FR-001--FR-009: {title: Identity, policy, consent, and data rights, modules: [identity, policy], status: planned, apis: [], code: [], tests: []}
+  FR-010--FR-013: {title: Profile, goals, and preferences, modules: [profile], status: planned, apis: [], code: [], tests: []}
+  FR-014--FR-020: {title: Quest catalog and recommendation, modules: [quests], status: planned, apis: [], code: [], tests: []}
+  FR-021--FR-027: {title: Quest sessions and device wellbeing, modules: [quests, device_wellbeing], status: planned, apis: [], code: [], tests: []}
+  FR-028--FR-036: {title: Verification and evidence, modules: [verification], status: planned, apis: [], code: [], tests: []}
+  FR-037--FR-041: {title: Reflection, modules: [reflection], status: planned, apis: [], code: [], tests: []}
+  FR-042--FR-049: {title: Rewards and habits, modules: [rewards], status: planned, apis: [], code: [], tests: []}
+  FR-050--FR-055: {title: Family and school, modules: [family], status: planned, apis: [], code: [], tests: []}
+  FR-056--FR-063: {title: AI and content safety, modules: [ai_orchestration, policy], status: planned, apis: [], code: [], tests: []}
+  FR-064--FR-067: {title: Notifications, modules: [notifications], status: planned, apis: [], code: [], tests: []}
+  FR-068--FR-073: {title: Admin and analytics, modules: [admin, analytics], status: planned, apis: [], code: [], tests: []}
+  NFR-001--NFR-022: {title: Non-functional requirements, modules: [cross_cutting], status: planned, apis: [], code: [], tests: []}

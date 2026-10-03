@@ -4,7 +4,7 @@ Project IRL explores how a mobile product can help young people practise focus, 
 
 ## Status
 
-**Phase 0 — exploratory prototype.** The prototype validates whether the quest loop is understandable and useful. It has no backend, AI, authentication, guardian workflow, production verification, or reward economy. Prototype code is intentionally disposable and must not evolve implicitly into production code.
+**Phase 0.1 — exploratory prototype.** The local prototype tests a reliable quest/history loop, non-cash XP motivation, and clearly isolated commercial concept comprehension. It has no backend, AI, authentication, guardian workflow, production verification, payments, orders, redemption, or valuable reward economy. Prototype code is intentionally disposable and must not evolve implicitly into production code.
 
 ## Architecture direction
 
@@ -39,6 +39,10 @@ flutter run
 ```
 
 Validate with `dart format --output=none --set-exit-if-changed .`, `flutter analyze`, and `flutter test`.
+
+Phase 0.1 stores attempts, optional reflections, XP ledger entries, active timing state, and research preferences in app-local `shared_preferences`. Local data is neither a backup nor tamper-resistant; uninstalling/clearing app data removes it. The in-app privacy screen can deliberately delete it all. XP awards are provisionally **10 XP per eligible self-reported completion**, capped at **10 XP per quest per local day** and **30 XP total per local day**. Milestones are **0, 30, 70, 120 and 200 XP**. XP cannot be spent, transferred, redeemed, or converted into a future entitlement.
+
+See the [Phase 0.1 pilot protocol](docs/prototype/PHASE01_PILOT_PROTOCOL.md), [commercial feasibility gate](docs/prototype/COMMERCIAL_FEASIBILITY.md), and [XP separation decision](docs/adr/ADR-009.md). The “Explore concepts” screens are research previews only.
 
 ## Requirements and contribution
 

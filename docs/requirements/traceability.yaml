@@ -1,6 +1,19 @@
 srs_version: "1.0"
 srs_date: "2026-09-30"
 note: "Phase-0 is exploratory; no production requirement is implemented."
+prototype_research:
+  phase: "0.1"
+  status: exploratory_not_production_compliance
+  constraints: [FR-021--FR-024, FR-027--FR-045, FR-048, NFR-003, NFR-008, NFR-012]
+  code:
+    - prototypes/phase0_exploratory/lib/src/progress_service.dart
+    - prototypes/phase0_exploratory/lib/src/progress_store.dart
+    - prototypes/phase0_exploratory/lib/src/flow_controller.dart
+    - prototypes/phase0_exploratory/lib/src/app.dart
+  tests:
+    - prototypes/phase0_exploratory/test/flow_controller_test.dart
+    - prototypes/phase0_exploratory/test/progress_store_test.dart
+    - prototypes/phase0_exploratory/test/app_test.dart
 groups:
   FR-001--FR-009: {title: Identity, policy, consent, and data rights, modules: [identity, policy], status: planned, apis: [], code: [], tests: []}
   FR-010--FR-013: {title: Profile, goals, and preferences, modules: [profile], status: planned, apis: [], code: [], tests: []}

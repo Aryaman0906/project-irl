@@ -13,3 +13,5 @@ Use consented, facilitated sessions with synthetic profiles. Do not record audio
 | Progress screen | Progress is calm and secondary | Understands count without pressure | Treats count as worth/rank/streak debt | “How would missing a day feel?” | Screen dwell; pressure rating |
 
 No invasive analytics are required. Facilitators may record anonymous task completion, elapsed bands, observed confusion, voluntary ratings, and de-identified notes. Do not infer honesty or psychological traits.
+
+Phase 0.1 reliability and physical-device procedures are maintained in `PHASE01_PILOT_PROTOCOL.md`. Core checks must pass before concept previews are shown.

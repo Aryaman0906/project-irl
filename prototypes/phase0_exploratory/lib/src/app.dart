@@ -14,12 +14,14 @@ class ProjectIrlPrototypeApp extends StatefulWidget {
   State<ProjectIrlPrototypeApp> createState() => _ProjectIrlPrototypeAppState();
 }
 
-class _ProjectIrlPrototypeAppState extends State<ProjectIrlPrototypeApp> {
+class _ProjectIrlPrototypeAppState extends State<ProjectIrlPrototypeApp>
+    with WidgetsBindingObserver {
   late final QuestFlowController controller;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     controller = QuestFlowController(
       widget.progressStore ?? SharedPreferencesProgressStore(),
     );
@@ -28,8 +30,18 @@ class _ProjectIrlPrototypeAppState extends State<ProjectIrlPrototypeApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      controller.checkpoint();
+    }
   }
 
   @override
@@ -66,6 +78,13 @@ class PrototypeShell extends StatelessWidget {
           ),
         ],
       ),
+      actions: [
+        IconButton(
+          tooltip: 'Local privacy and reset',
+          onPressed: controller.showPrivacy,
+          icon: const Icon(Icons.privacy_tip_outlined),
+        ),
+      ],
     ),
     body: SafeArea(
       child: Center(
@@ -73,7 +92,27 @@ class PrototypeShell extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 680),
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: _currentScreen(),
+            child: controller.loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      semanticsLabel: 'Loading local progress',
+                    ),
+                  )
+                : Column(
+                    children: [
+                      if (controller.error != null)
+                        MaterialBanner(
+                          content: Text(controller.error!),
+                          actions: [
+                            TextButton(
+                              onPressed: controller.dismissError,
+                              child: const Text('Dismiss'),
+                            ),
+                          ],
+                        ),
+                      Expanded(child: _currentScreen()),
+                    ],
+                  ),
           ),
         ),
       ),
@@ -81,7 +120,10 @@ class PrototypeShell extends StatelessWidget {
   );
 
   Widget _currentScreen() => switch (controller.step) {
-    FlowStep.welcome => WelcomeScreen(onBegin: controller.begin),
+    FlowStep.welcome => WelcomeScreen(
+      onBegin: controller.begin,
+      controller: controller,
+    ),
     FlowStep.goals => GoalScreen(onSelected: controller.selectGoal),
     FlowStep.quests => QuestOptionsScreen(controller: controller),
     FlowStep.details => QuestDetailsScreen(controller: controller),
@@ -90,12 +132,15 @@ class PrototypeShell extends StatelessWidget {
     FlowStep.reflection => ReflectionScreen(controller: controller),
     FlowStep.evidence => EvidenceScreen(controller: controller),
     FlowStep.progress => ProgressScreen(controller: controller),
+    FlowStep.concepts => ConceptsScreen(controller: controller),
+    FlowStep.privacy => PrivacyScreen(controller: controller),
   };
 }
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key, required this.onBegin});
+  const WelcomeScreen({super.key, required this.onBegin, this.controller});
   final VoidCallback onBegin;
+  final QuestFlowController? controller;
 
   @override
   Widget build(BuildContext context) => _Page(
@@ -108,6 +153,17 @@ class WelcomeScreen extends StatelessWidget {
         icon: const Icon(Icons.explore_outlined),
         label: const Text(AppStrings.begin),
       ),
+      const SizedBox(height: 12),
+      if (controller != null) ...[
+        OutlinedButton(
+          onPressed: controller!.showProgress,
+          child: const Text('View progress and history'),
+        ),
+        TextButton(
+          onPressed: controller!.showConcepts,
+          child: const Text('Explore concepts (research only)'),
+        ),
+      ],
     ],
   );
 }
@@ -229,8 +285,11 @@ class SessionScreen extends StatelessWidget {
     final time =
         '${elapsed.inMinutes.toString().padLeft(2, '0')}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}';
     return _Page(
-      title: 'Quest in progress',
-      subtitle: controller.selectedQuest!.title,
+      title: controller.currentAttempt?.status == AttemptStatus.interrupted
+          ? 'Timing interrupted'
+          : 'Quest in progress',
+      subtitle:
+          controller.selectedQuest?.title ?? controller.currentAttempt?.questId,
       children: [
         Semantics(
           label: 'Elapsed time $time',
@@ -241,6 +300,16 @@ class SessionScreen extends StatelessWidget {
         const Text(
           'You can put the phone aside now. Return when you choose to finish or cancel.',
         ),
+        if (controller.currentAttempt?.status == AttemptStatus.interrupted) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'The app was closed or timing became uncertain. The activity was not verified and no XP was granted.',
+          ),
+          OutlinedButton(
+            onPressed: controller.resumeInterrupted,
+            child: const Text('Resume approximate timer'),
+          ),
+        ],
         const SizedBox(height: 32),
         FilledButton(
           onPressed: controller.requestCompletion,
@@ -290,6 +359,13 @@ class ReflectionScreen extends StatefulWidget {
 class _ReflectionScreenState extends State<ReflectionScreen> {
   String? difficulty;
   String? helped;
+  final note = TextEditingController();
+
+  @override
+  void dispose() {
+    note.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => _Page(
@@ -333,13 +409,31 @@ class _ReflectionScreenState extends State<ReflectionScreen> {
         ),
       ),
       const SizedBox(height: 16),
+      TextField(
+        controller: note,
+        maxLength: 240,
+        decoration: const InputDecoration(
+          labelText: 'Optional private note (skip if you prefer)',
+          border: OutlineInputBorder(),
+        ),
+      ),
       FilledButton(
         onPressed: difficulty == null || helped == null
             ? null
             : () => widget.controller.submitReflection(
-                ReflectionAnswer(difficulty: difficulty!, helpedMost: helped!),
+                ReflectionAnswer(
+                  difficulty: difficulty!,
+                  helpedMost: helped!,
+                  note: note.text,
+                ),
               ),
         child: const Text('Continue'),
+      ),
+      TextButton(
+        onPressed: () => widget.controller.submitReflection(
+          const ReflectionAnswer(difficulty: 'Skipped', helpedMost: 'Skipped'),
+        ),
+        child: const Text('Skip reflection'),
       ),
     ],
   );
@@ -357,6 +451,8 @@ class EvidenceScreen extends StatelessWidget {
         label: 'SELF_REPORTED',
         explanation: 'You reported that the activity happened. The app did not independently observe the real-world activity.',
       ),
+      const SizedBox(height: 12),
+      Text(controller.lastCompletion?.explanation ?? 'Completion recorded.'),
       const _EvidenceCard(
         label: 'DEVICE_VERIFIED',
         explanation: 'In a future approved feature, this could mean a permitted device condition was observed. It would not prove the underlying activity.',
@@ -383,14 +479,45 @@ class ProgressScreen extends StatelessWidget {
     title: AppStrings.progressTitle,
     children: [
       Text(
-        '${controller.completionCount}',
+        '${controller.totalXp} XP',
         style: Theme.of(context).textTheme.displayLarge,
       ),
-      const Text('different quests reported complete on this device'),
+      const Text(
+        'Non-cash, non-transferable participation progress. XP cannot be spent and creates no entitlement.',
+      ),
+      const SizedBox(height: 12),
+      Text(
+        '${controller.weeklyParticipation} completed attempt(s) this local Monday–Sunday week',
+      ),
+      Text(
+        'Participation milestone ${controller.milestoneIndex + 1}${controller.nextMilestone == null ? ' · highest prototype milestone' : ' · next at ${controller.nextMilestone} XP'}',
+      ),
       const SizedBox(height: 12),
       const Text(
         'This is not a morality score, rank, streak, or production reward. Missing a day changes nothing.',
       ),
+      const Divider(height: 32),
+      Text('Recent attempts', style: Theme.of(context).textTheme.titleLarge),
+      if (controller.attempts.isEmpty)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'No attempts yet. Completed, cancelled and interrupted quests will appear here.',
+          ),
+        ),
+      ...controller.attempts.take(10).map((attempt) {
+        final matchingAwards = controller.awards.where(
+          (a) => a.attemptId == attempt.id,
+        );
+        final award = matchingAwards.isEmpty ? null : matchingAwards.first;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(attempt.questId),
+          subtitle: Text(
+            '${attempt.status.name.toUpperCase()} · ${_evidenceName(attempt.evidence)}${award == null ? ' · no XP' : ' · +${award.amount} XP (${award.reasonCode})'}',
+          ),
+        );
+      }),
       const SizedBox(height: 24),
       FilledButton(
         onPressed: controller.nextQuest,
@@ -399,6 +526,122 @@ class ProgressScreen extends StatelessWidget {
       TextButton(
         onPressed: controller.finish,
         child: const Text('Finish for now'),
+      ),
+    ],
+  );
+}
+
+class ConceptsScreen extends StatelessWidget {
+  const ConceptsScreen({super.key, required this.controller});
+  final QuestFlowController controller;
+
+  @override
+  Widget build(BuildContext context) => _Page(
+    title: 'Explore concepts',
+    subtitle: 'Separate research preview — nothing here can buy, redeem, subscribe, or change XP.',
+    children: [
+      const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'Research concept only. Purchases and redemption are unavailable. XP has no cash value and creates no entitlement to future rewards.',
+          ),
+        ),
+      ),
+      Text(
+        'Possible optional subscription',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      const Text(
+        'Free core would keep quests, participation, history, privacy controls and all accumulated XP. A hypothetical option could add curated activity packs, printable family activities, planning tools and themes. No price or availability is proposed.',
+      ),
+      OutlinedButton(
+        onPressed: () =>
+            controller.selectConcept('subscription-optional-content'),
+        child: Text(
+          controller.researchSelections.contains(
+                'subscription-optional-content',
+              )
+              ? 'Interest saved locally'
+              : 'This optional content interests me',
+        ),
+      ),
+      const Divider(height: 32),
+      Text(
+        'Illustrative shop categories',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      const Text(
+        'Which category would interest you? This does not place an order or reserve stock. No merchant partnership is implied.',
+      ),
+      for (final category in const {
+        'activity-kits': 'Colouring and activity kits',
+        'toys': 'Age-appropriate toys',
+        'pet-accessories': 'Non-consumable pet accessories',
+        'generic-voucher': 'Generic shopping-voucher concept',
+      }.entries)
+        CheckboxListTile(
+          value: controller.researchSelections.contains(category.key),
+          onChanged: controller.researchSelections.contains(category.key)
+              ? null
+              : (_) => controller.selectConcept(category.key),
+          title: Text(category.value),
+          subtitle: const Text('Research preference only'),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
+      TextButton(
+        onPressed: controller.finish,
+        child: const Text('Back to start'),
+      ),
+    ],
+  );
+}
+
+class PrivacyScreen extends StatelessWidget {
+  const PrivacyScreen({super.key, required this.controller});
+  final QuestFlowController controller;
+
+  @override
+  Widget build(BuildContext context) => _Page(
+    title: 'Local data and privacy',
+    children: [
+      const Text(
+        'This prototype stores quest attempts, timestamps, status, self-reported evidence labels, optional reflections, XP ledger entries and research preferences in this app’s local shared-preferences storage. It sends none of this to a backend.',
+      ),
+      const SizedBox(height: 12),
+      const Text(
+        'Local storage is not tamper-proof, may be removed by uninstalling or clearing app data, and is not a backup or protection against a modified app. Do not enter names, contact details, addresses, payment/bank/UPI details, identity documents or information about another person.',
+      ),
+      const SizedBox(height: 24),
+      FilledButton.tonalIcon(
+        icon: const Icon(Icons.delete_forever),
+        label: const Text('Delete all local prototype data'),
+        onPressed: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Delete all local data?'),
+              content: const Text(
+                'This removes attempts, reflections, XP awards, active timing and research selections. This cannot be undone.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Keep data'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Delete all'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) await controller.reset();
+        },
+      ),
+      TextButton(
+        onPressed: controller.finish,
+        child: const Text('Back to start'),
       ),
     ],
   );
@@ -468,4 +711,12 @@ String _domainDescription(SkillDomain domain) => switch (domain) {
   SkillDomain.responsibility => 'Take care of one practical commitment.',
   SkillDomain.listening => 'Give attention without recording or judging.',
   SkillDomain.gratitude => 'Notice support without pressure to perform.',
+};
+
+String _evidenceName(EvidenceLabel label) => switch (label) {
+  EvidenceLabel.deviceVerified => 'DEVICE_VERIFIED',
+  EvidenceLabel.witnessConfirmed => 'WITNESS_CONFIRMED',
+  EvidenceLabel.outcomeSupported => 'OUTCOME_SUPPORTED',
+  EvidenceLabel.selfReported => 'SELF_REPORTED',
+  EvidenceLabel.unverifiable => 'UNVERIFIABLE',
 };
